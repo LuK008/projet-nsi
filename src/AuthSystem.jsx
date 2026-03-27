@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 
-const API = 'http://localhost:3001/api';
+const API = '/api';
 
 // --- Utilitaires ---
 function validateEmail(email) {
