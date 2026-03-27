@@ -5,7 +5,7 @@ const { createClient } = require('@libsql/client');
 const path = require('path');
 
 const app = express();
-const PORT = 3001;
+const PORT = process.env.PORT || 3001;
 
 // --- Base de données SQLite ---
 const db = createClient({
@@ -26,7 +26,7 @@ async function initDB() {
 }
 
 // --- Middlewares ---
-app.use(cors({ origin: 'http://localhost:5173' })); // Autorise le front React (Vite)
+app.use(cors({ origin: '*' }));
 app.use(express.json());
 
 // --- Routes ---
@@ -121,6 +121,12 @@ app.get('/api/users/count', async (req, res) => {
   } catch (err) {
     res.status(500).json({ error: 'Erreur serveur.' });
   }
+});
+
+app.use(express.static(path.join(__dirname, '../dist')));
+
+app.get('*', (req, res) => {
+  res.sendFile(path.join(__dirname, '../dist', 'index.html'));
 });
 
 // --- Démarrage ---
