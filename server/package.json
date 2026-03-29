@@ -1,7 +1,6 @@
 {
   "name": "server",
   "version": "1.0.0",
-  "description": "",
   "main": "index.js",
   "type": "commonjs",
   "scripts": {
@@ -11,6 +10,6 @@
     "express": "^5.2.1",
     "cors": "^2.8.6",
     "bcryptjs": "^3.0.3",
-    "@libsql/client": "^0.17.2"
+    "pg": "^8.11.3"
   }
 }
