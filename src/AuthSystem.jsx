@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 
-const API = '/api';
+const API = 'https://projet-nsi-qx2j.onrender.com/api';
 
 // --- Utilitaires ---
 function validateEmail(email) {
