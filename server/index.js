@@ -1,54 +1,44 @@
 const express = require('express');
 const bcrypt = require('bcryptjs');
 const cors = require('cors');
-const { Pool } = require('pg');
-const path = require('path');
+const { createClient } = require('@libsql/client');
 
 const app = express();
 const PORT = process.env.PORT || 3001;
 
-// --- Base de données PostgreSQL ---
-const db = new Pool({
-  connectionString: process.env.DATABASE_URL,
-  ssl: { rejectUnauthorized: false }
-});
+const db = createClient({ url: 'file:./users.db' });
 
-// Initialiser la table users au démarrage
 async function initDB() {
-  await db.query(`
+  await db.execute(`
     CREATE TABLE IF NOT EXISTS users (
-      id        SERIAL PRIMARY KEY,
-      email     TEXT NOT NULL UNIQUE,
-      password  TEXT NOT NULL,
-      createdAt TEXT NOT NULL
+      id        INTEGER PRIMARY KEY AUTOINCREMENT,
+      email     TEXT    NOT NULL UNIQUE,
+      password  TEXT    NOT NULL,
+      createdAt TEXT    NOT NULL
     )
   `);
-  console.log('✅ Base de données PostgreSQL prête');
+  console.log('✅ Base de données prête (users.db)');
 }
 
-// --- Middlewares ---
 app.use(cors({ origin: '*' }));
 app.use(express.json());
 
-// --- Servir le frontend React ---
-app.use(express.static(path.join(__dirname, '../dist')));
-
-// --- Routes ---
 app.post('/api/register', async (req, res) => {
   const { email, password } = req.body;
   if (!email || !password) return res.status(400).json({ error: 'Email et mot de passe requis.' });
   if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) return res.status(400).json({ error: 'Adresse email invalide.' });
   if (password.length < 6) return res.status(400).json({ error: 'Mot de passe trop court (6 caractères min.).' });
-
   try {
     const hashedPassword = await bcrypt.hash(password, 10);
-    await db.query(
-      'INSERT INTO users (email, password, createdAt) VALUES ($1, $2, $3)',
-      [email, hashedPassword, new Date().toISOString()]
-    );
+    await db.execute({
+      sql: 'INSERT INTO users (email, password, createdAt) VALUES (?, ?, ?)',
+      args: [email, hashedPassword, new Date().toISOString()]
+    });
     return res.status(201).json({ message: 'Compte créé avec succès !' });
   } catch (err) {
-    if (err.code === '23505') return res.status(409).json({ error: 'Cet email est déjà utilisé.' });
+    if (err.message && err.message.includes('UNIQUE constraint failed')) {
+      return res.status(409).json({ error: 'Cet email est déjà utilisé.' });
+    }
     return res.status(500).json({ error: 'Erreur serveur.' });
   }
 });
@@ -56,18 +46,18 @@ app.post('/api/register', async (req, res) => {
 app.post('/api/login', async (req, res) => {
   const { email, password } = req.body;
   if (!email || !password) return res.status(400).json({ error: 'Email et mot de passe requis.' });
-
   try {
-    const result = await db.query('SELECT * FROM users WHERE email = $1', [email]);
+    const result = await db.execute({
+      sql: 'SELECT * FROM users WHERE email = ?',
+      args: [email]
+    });
     const user = result.rows[0];
     if (!user) return res.status(401).json({ error: 'Email ou mot de passe incorrect.' });
-
     const passwordOk = await bcrypt.compare(password, user.password);
     if (!passwordOk) return res.status(401).json({ error: 'Email ou mot de passe incorrect.' });
-
     return res.json({
       message: 'Connexion réussie !',
-      user: { id: user.id, email: user.email, createdAt: user.createdat }
+      user: { id: user.id, email: user.email, createdAt: user.createdAt }
     });
   } catch (err) {
     return res.status(500).json({ error: 'Erreur serveur.' });
@@ -76,18 +66,13 @@ app.post('/api/login', async (req, res) => {
 
 app.get('/api/users/count', async (req, res) => {
   try {
-    const result = await db.query('SELECT COUNT(*) as total FROM users');
+    const result = await db.execute('SELECT COUNT(*) as total FROM users');
     res.json({ total: result.rows[0].total });
   } catch (err) {
     res.status(500).json({ error: 'Erreur serveur.' });
   }
 });
 
-app.get('*splat', (req, res) => {
-  res.sendFile(path.join(__dirname, '../dist', 'index.html'));
-});
-
-// --- Démarrage ---
 initDB().then(() => {
   app.listen(PORT, () => {
     console.log(`🚀 Serveur démarré sur http://localhost:${PORT}`);
