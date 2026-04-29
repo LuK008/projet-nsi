@@ -90,7 +90,7 @@ app.get('/api/users/count', async (req, res) => {
 });
 
 // Rediriger toutes les autres URLs vers le front-end React
-app.get('*', (req, res) => {
+app.get('*splat', (req, res) => {
   res.sendFile(path.join(__dirname, '../dist', 'index.html'));
 });
 
